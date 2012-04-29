@@ -16,125 +16,103 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- // TODO: better use Hamster DBus service
+ // TODO: improve activities matching
+
 const Main = imports.ui.main;
 const Search = imports.ui.search;
 const GLib = imports.gi.GLib;
 const Shell = imports.gi.Shell;
 const Util = imports.misc.util;
+const DBus = imports.dbus;
+const Lang = imports.lang;
+
+const HamsterProxy = DBus.makeProxyClass({
+    name: 'org.gnome.Hamster',
+    methods: [
+        {
+            name: 'GetActivities',
+            inSignature: 's',
+            outSignature: 'a(ss)'
+        },
+    ]
+});
 
 var searchProvider = null;
 
-function HamsterSearchProvider() {
-    this._init();
-}
+const HamsterSearchProvider = new Lang.Class({
+    Name: 'HamsterSearchProvider',
+    Extends: Search.SearchProvider,
 
-HamsterSearchProvider.prototype = {
-    __proto__: Search.SearchProvider.prototype,
-
-    _init: function(name) {
-        Search.SearchProvider.prototype._init.call(this, "Hamster Activities");
-        this._activities = this._loadActivities();
+    _init: function()
+    {
+        this.parent('Hamster Activities');
+        this.async = true;
+        this._proxy = new HamsterProxy(DBus.session, 'org.gnome.Hamster', '/org/gnome/Hamster');
+        this._appSys = Shell.AppSystem.get_default();
+        this._app = this._appSys.lookup_app('hamster-time-tracker.desktop');
     },
 
-    _loadActivities: function() {
-        let [res, out, err, status] = GLib.spawn_command_line_sync('hamster-cli list-activities');
-        if (res) {
-            return out
-                .toString()
-                .split('\n')
-                .map(String.trim)
-                .filter(function(item) {return item.length})
-                .map(function(item) {
-                    return {
-                        value: item,
-                        chunks: item.toLowerCase().split(/[\s@]+/)
-                    };
-                });
-        }
-        else {
-            return [];
+    getSubsearchResultSetAsync: function(previousResults, newTerms)
+    {
+        this.getInitialResultSetAsync(newTerms);
+    },
+
+    getInitialResultSetAsync: function(terms)
+    {
+        for (let i=0, nTerms=terms.length; i < nTerms; ++i) {
+            global.log('getInitialResultSetAsync')
+            this._proxy.GetActivitiesRemote(terms[i], Lang.bind(this, function(results, err) {
+                try {
+                    let g = results.length;
+                    this.searchSystem.pushResults(this, results);
+                }
+                catch (e) {
+                }
+            }));
         }
     },
 
-    _getActivities: function() {
-        return this._activities.map(function(item) {
+    getResultMetasAsync: function(results, callback)
+    {
+        global.log('getResultMetasAsync');
+        callback(this.getResultMetas(results));
+    },
+
+    getResultMetas: function(ids)
+    {
+        global.log('getResultMetas: '+ids);
+        var app = this._app;
+        return ids.map(function(id) {
             return {
-                __proto__: item,
-                score: 0
+                'id': id,
+                'name': id.join('@'),
+                'createIcon': function(size) {
+                    return app.create_icon_texture(size);
+                }
             };
         });
     },
 
-    getResultMetas: function(resultIds) {
-        let metas = [];
-
-        for (let i = 0, n = resultIds.length; i < n; i++) {
-            metas.push(this.getResultMeta(resultIds[i]));
-        }
-        return metas;
-    },
-
-    getResultMeta: function(resultId) {
-        let appSys = Shell.AppSystem.get_default();
-        let app = appSys.lookup_app('hamster-time-tracker.desktop');
-
-        return {
-            'id': resultId,
-            'name': resultId.value,
-            'createIcon': function(size) {
-                return app.create_icon_texture(size);
-            }
-        };
-    },
-
     activateResult: function(id) {
-        Util.spawn(['hamster-cli', 'start', id.value]);
-        Main.notify('Starting ' + id.value);
+        global.log('start activity: ' + id);
     },
 
-    // the more of term matches, the higher the score
-    _scoreItem: function(activity, term) {
-        for (let i=0, n=activity.chunks.length; i < n; ++i) {
-            if (activity.chunks[i].indexOf(term) >= 0)
-                activity.score +=  term.length / activity.chunks[i].length;
-        }
-    },
+});
 
-    getInitialResultSet: function(terms) {
-        let terms_lower = terms.map(String.toLowerCase);
-        let results = [];
-        let activities = this._getActivities();
-        for (let i=0, n=activities.length; i < n; ++i) {
-            for (let ii=0, nn=terms_lower.length; ii < nn; ++ii) {
-                this._scoreItem(activities[i], terms_lower[ii]);
-            }
-            if (activities[i].score >= 0.2)
-                results.push(activities[i]);
-        }
-        // ordering by score descending, so most matching results are displayed first
-        results.sort(function(a, b) {
-            return a.score < b.score;
-        });
-        return results;
-    },
-
-    getSubsearchResultSet: function(previousResults, terms) {
-        return this.getInitialResultSet(terms);
-    },
-};
-
-function init(meta) {
+function init(meta)
+{
 }
 
-function enable() {
+function enable()
+{
     if (searchProvider==null) {
         searchProvider = new HamsterSearchProvider();
         Main.overview.addSearchProvider(searchProvider);
     }
 }
 
-function disable() {
+function disable()
+{
     if  (searchProvider!=null) {
         Main.overview.removeSearchProvider(searchProvider);
         searchProvider = null;

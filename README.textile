@@ -1,4 +1,4 @@
 Contains various attempts at writing gnome-shell extensions. Some might work, some might be useful, some might break your gnome-shell.
 
 * hamster-search-provider@gnome-shell-extensions.fre-sch.github.com
-  Search and start Hamster Activities.  This is just a proof-of-concept. Should actually be using Hamster's Dbus interface.
+  Search and start Hamster Activities.  This is just a proof-of-concept.  Now using Hamster's DBus interface.  Now add improved matching/searching back again.

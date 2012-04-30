@@ -34,6 +34,11 @@ const HamsterProxy = DBus.makeProxyClass({
             inSignature: 's',
             outSignature: 'a(ss)'
         },
+        {
+            name: 'AddFact',
+            inSignature: 'siib',
+            outSignature: 'i',
+        }
     ]
 });
 
@@ -60,7 +65,6 @@ const HamsterSearchProvider = new Lang.Class({
     getInitialResultSetAsync: function(terms)
     {
         for (let i=0, nTerms=terms.length; i < nTerms; ++i) {
-            global.log('getInitialResultSetAsync')
             this._proxy.GetActivitiesRemote(terms[i], Lang.bind(this, function(results, err) {
                 try {
                     let g = results.length;
@@ -74,13 +78,11 @@ const HamsterSearchProvider = new Lang.Class({
 
     getResultMetasAsync: function(results, callback)
     {
-        global.log('getResultMetasAsync');
         callback(this.getResultMetas(results));
     },
 
     getResultMetas: function(ids)
     {
-        global.log('getResultMetas: '+ids);
         var app = this._app;
         return ids.map(function(id) {
             return {
@@ -93,8 +95,19 @@ const HamsterSearchProvider = new Lang.Class({
         });
     },
 
-    activateResult: function(id) {
-        global.log('start activity: ' + id);
+    activateResult: function(id)
+    {
+        let d = new Date();
+        let now = parseInt(d.getTime() / 1000);
+        this._proxy.AddFactRemote(id.join('@'), now, 0, false, function(result, err) {
+            if (!err) {
+                // notify start
+                global.log('start:' + id.join('@'));
+            }
+            else {
+                // notify err
+            }
+        });
     },
 
 });

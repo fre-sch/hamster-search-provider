@@ -1,4 +1,5 @@
-Contains various attempts at writing gnome-shell extensions. Some might work, some might be useful, some might break your gnome-shell.
+Contains various attempts at writing gnome-shell extensions. Some might work,
+some might be useful, some might break your gnome-shell.
 
 ### hamster-search-provider@gnome-shell-extensions.fre-sch.github.com
 
@@ -9,10 +10,10 @@ Done:
 *    Basic search results for activities.
 *    Using DBus interface
 *    Starting activities
+*    Improve searching/matching
 
 Todo:
 
-*   Improve searching/matching
 *   Start hamster-service if not running
 *   Feedback (Notifications)
 

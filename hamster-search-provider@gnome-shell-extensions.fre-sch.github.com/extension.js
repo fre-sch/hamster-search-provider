@@ -44,6 +44,9 @@ const HamsterProxy = DBus.makeProxyClass({
 
 var searchProvider = null;
 
+// *sigh* unicode chars are not considered to be in \w or \W
+const SplitRegExp = new RegExp('[^a-z0-9äöü]+', 'i');
+
 const HamsterSearchProvider = new Lang.Class({
     Name: 'HamsterSearchProvider',
     Extends: Search.SearchProvider,
@@ -64,16 +67,43 @@ const HamsterSearchProvider = new Lang.Class({
 
     getInitialResultSetAsync: function(terms)
     {
-        for (let i=0, nTerms=terms.length; i < nTerms; ++i) {
-            this._proxy.GetActivitiesRemote(terms[i], Lang.bind(this, function(results, err) {
-                try {
-                    let g = results.length;
-                    this.searchSystem.pushResults(this, results);
-                }
-                catch (e) {
-                }
-            }));
-        }
+        this._proxy.GetActivitiesRemote('', Lang.bind(this, function(results, err) {
+            try {
+                let scored_results = results
+                    .map(function(result) {
+                        let r = {};
+                        r.id = result.join('@');
+                        let chunks = r.id.split(SplitRegExp).map(String.toLowerCase);
+                        r.score = chunks
+                            .map(function(ch) {
+                                return terms
+                                    .map(String.toLowerCase)
+                                    .map(function (term) {
+                                        return term.length / ch.length * (ch.indexOf(term) + 1);
+                                    })
+                                    .reduce(function(prev, cur) {
+                                        return prev + cur;
+                                    })
+                                ;
+                            })
+                            .reduce(function(prev, cur) {
+                                return prev + cur;
+                            })
+                        ;
+                        return r;
+                    })
+                    .filter(function(result) {
+                        return result.score >= 0.2;
+                    })
+                ;
+                scored_results.sort(function(a, b) {
+                    return a.score < b.score;
+                });
+                this.searchSystem.pushResults(this, scored_results);
+            }
+            catch (e) {
+            }
+        }));
     },
 
     getResultMetasAsync: function(results, callback)
@@ -81,13 +111,13 @@ const HamsterSearchProvider = new Lang.Class({
         callback(this.getResultMetas(results));
     },
 
-    getResultMetas: function(ids)
+    getResultMetas: function(results)
     {
         var app = this._app;
-        return ids.map(function(id) {
+        return results.map(function(result) {
             return {
-                'id': id,
-                'name': id.join('@'),
+                'id': result.id,
+                'name': result.id,
                 'createIcon': function(size) {
                     return app.create_icon_texture(size);
                 }
@@ -99,10 +129,10 @@ const HamsterSearchProvider = new Lang.Class({
     {
         let d = new Date();
         let now = parseInt(d.getTime() / 1000);
-        this._proxy.AddFactRemote(id.join('@'), now, 0, false, function(result, err) {
+        this._proxy.AddFactRemote(id, now, 0, false, function(result, err) {
             if (!err) {
                 // notify start
-                global.log('start:' + id.join('@'));
+                global.log('start:' + id);
             }
             else {
                 // notify err

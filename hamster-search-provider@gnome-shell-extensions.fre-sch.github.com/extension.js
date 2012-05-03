@@ -37,7 +37,12 @@ const HamsterProxy = DBus.makeProxyClass({
         {
             name: 'AddFact',
             inSignature: 'siib',
-            outSignature: 'i',
+            outSignature: 'i'
+        },
+        {
+            name: 'StopTracking',
+            inSignature: 'i',
+            outSignature: ''
         }
     ]
 });
@@ -69,6 +74,7 @@ const HamsterSearchProvider = new Lang.Class({
     {
         this._proxy.GetActivitiesRemote('', Lang.bind(this, function(results, err) {
             try {
+                results.push(['stop', 'current']);
                 let scored_results = results
                     .map(function(result) {
                         let r = {};
@@ -128,16 +134,23 @@ const HamsterSearchProvider = new Lang.Class({
     activateResult: function(id)
     {
         let d = new Date();
+        global.log(d);
         let now = parseInt(d.getTime() / 1000);
-        this._proxy.AddFactRemote(id, now, 0, false, function(result, err) {
-            if (!err) {
-                // notify start
-                global.log('start:' + id);
-            }
-            else {
-                // notify err
-            }
-        });
+        if (id == 'stop@current')
+        {
+            this._proxy.StopTrackingRemote(now);
+        }
+        else {
+            this._proxy.AddFactRemote(id, now, 0, false, function(result, err) {
+                if (!err) {
+                    // notify start
+                    global.log('start:' + id);
+                }
+                else {
+                    // notify err
+                }
+            });
+        }
     },
 
 });

@@ -22,15 +22,10 @@ const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
 const Search = imports.ui.search;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
 const Util = imports.misc.util;
-const Gettext = imports.gettext;
-const _ = Gettext.domain('hamster-extension').gettext;
-
 
 const HamsterProxy = DBus.makeProxyClass({
     name: 'org.gnome.Hamster',
@@ -54,6 +49,11 @@ const HamsterProxy = DBus.makeProxyClass({
             name: 'Toggle',
             inSignature: '',
             outSignature: ''
+        },
+        {
+            name: 'GetTodaysFacts',
+            inSignature: '',
+            outSignature: 'a(iiissisasii)',
         }
     ],
     signals: [
@@ -70,13 +70,12 @@ const HamsterProxy = DBus.makeProxyClass({
 
 var searchProvider = null;
 
-var panelButton = null;
-
 var hamsterProxy = new HamsterProxy(DBus.session, 'org.gnome.Hamster', '/org/gnome/Hamster');
 hamsterProxy.startActivity = function(activity)
 {
     let d = new Date();
-    let now = parseInt(d.getTime() / 1000);
+    // weird, why is TimezoneOffset negative? should be positive for my zone
+    let now = parseInt(Date.now() / 1000) - d.getTimezoneOffset() * 60;
     if (activity == 'stop@current')
     {
         this.StopTrackingRemote(now);
@@ -185,117 +184,12 @@ const HamsterSearchProvider = new Lang.Class({
     },
 });
 
-const HamsterActivitiesButton = new Lang.Class({
-    Name: 'HamsterActivitiesButton',
-    Extends: PanelMenu.Button,
-
-    _createIconLabel: function() {
-        let appSys = Shell.AppSystem.get_default();
-        let app = appSys.lookup_app('hamster-time-tracker.desktop');
-        this._icon = app.create_icon_texture(16);
-
-        let box = new St.BoxLayout({ name: 'hamsterActivitiesButton' });
-        this.actor.add_actor(box);
-
-        let iconBox = new St.Bin({name:'hamsterIcon'})
-        box.add(iconBox, { y_align: St.Align.MIDDLE, y_fill: false });
-        iconBox.child = this._icon;
-
-        this._label = new St.Label({name:'hamsterLabel'});
-        box.add(this._label, { y_align: St.Align.MIDDLE, y_fill: false });
-    },
-
-    _init: function()
-    {
-        this.parent(St.Align.START);
-
-        this._createIconLabel();
-
-        hamsterProxy.connect('ActivitiesChanged', Lang.bind(this, function() {
-            this._refresh();
-        }));
-
-        this._refresh();
-    },
-
-    _createSectionActivities: function()
-    {
-        let section = new PopupMenu.PopupMenuSection();
-        this.menu.addMenuItem(section);
-        hamsterProxy.GetActivitiesRemote('', Lang.bind(this, function(activities, err) {
-            activities.sort(function(a, b) {
-                a = a.map(String.toLowerCase);
-                b = b.map(String.toLowerCase);
-                if (a[1] == b[1])
-                    return a[0] > b[0];
-                return a[1] > b[1];
-            });
-            for (let i=0, n=activities.length; i < n; ++i) {
-                let activity = activities[i].join('@');
-                let item = new PopupMenu.PopupMenuItem(activity);
-                item.connect('activate', Lang.bind(this, function(item) {
-                    this.onItemActivate(activity);
-                }));
-                section.addMenuItem(item);
-            }
-        }));
-    },
-
-    _createSectionNewTask: function()
-    {
-        let section = new PopupMenu.PopupMenuSection();
-        this.menu.addMenuItem(section);
-
-        let newTaskEntry = new St.Entry({
-            name: "newTaskEntry",
-            hint_text: _("New task..."),
-            track_hover: true,
-            can_focus: true
-        });
-        newTaskEntry.add_style_class_name('popup-menu-item');
-
-        newTaskEntry.clutter_text.connect('key-press-event', Lang.bind(this, function(o, e)
-        {
-            let symbol = e.get_key_symbol();
-            if (symbol == Clutter.Return) {
-                this.menu.close();
-                hamsterProxy.startActivity(newTaskEntry.get_text());
-                this._refresh();
-            }
-        }));
-
-        section.addActor(newTaskEntry);
-    },
-
-    _refresh: function()
-    {
-        this.menu.removeAll();
-
-        this._createSectionActivities();
-
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-
-        this._createSectionNewTask();
-    },
-
-    onItemActivate: function(activity)
-    {
-        hamsterProxy.startActivity(activity);
-    },
-});
-
 function init(metadata)
 {
 }
 
 function enable()
 {
-    if (panelButton == null) {
-        panelButton = new HamsterActivitiesButton();
-        Main.panel._rightBox.insert_child_at_index(panelButton.actor, 0);
-        Main.panel._menus.addMenu(panelButton.menu);
-
-    }
     if (searchProvider==null) {
         searchProvider = new HamsterSearchProvider();
         Main.overview.addSearchProvider(searchProvider);
@@ -307,9 +201,5 @@ function disable()
     if  (searchProvider!=null) {
         Main.overview.removeSearchProvider(searchProvider);
         searchProvider = null;
-    }
-    if (panelButton != null) {
-        Main.panel._menus.removeMenu(panelButton.menu);
-        Main.panel._rightBox.remove_actor(panelButton.actor);
     }
 }

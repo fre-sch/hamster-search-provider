@@ -12,6 +12,7 @@ Done:
 *   Starting activities.
 *   Improve searching/matching.
 *   Stop current activity, search for "stop@current".
+*   Fix bug with Timestamps being UTC
 
 Todo:
 

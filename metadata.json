@@ -3,5 +3,5 @@
 	"uuid": "hamster-search-provider@gnome-shell-extensions.fre-sch.github.com",
 	"name": "Hamster Activities",
 	"description": "A search provider for Hamster-Time-Tracker Activities",
-	"url": "https://github.com/fre-sch/gnome-shell-extensions/hamster-search-provider"
+	"url": "https://github.com/fre-sch/hamster-search-provider"
 }

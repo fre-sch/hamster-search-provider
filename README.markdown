@@ -1,8 +1,3 @@
-Contains various attempts at writing gnome-shell extensions. Some might work,
-some might be useful, some might break your gnome-shell.
-
-### hamster-search-provider@gnome-shell-extensions.fre-sch.github.com
-
 Search and start Hamster Activities.
 
 Done:
